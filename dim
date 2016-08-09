@@ -27,6 +27,10 @@
 
 # drm-intel-next maintainer script
 
+# gvt maintainer script based on 'dim' tool
+#
+#    Zhenyu Wang <zhenyuw@linux.intel.com>
+
 # TODO
 # - extract the integration tree logic and make it generally useful, maybe for a
 #   drm-integration tree ...
@@ -62,13 +66,14 @@ fi
 DIM_PREFIX=${DIM_PREFIX:-$HOME/linux}
 
 # main maintainer repo under $DIM_PREFIX
-DIM_DRM_INTEL=${DIM_DRM_INTEL:-src}
+DIM_GVT_INTEL=${DIM_GVT_INTEL:-src}
 
-# name of the $drm_intel_ssh remote within $DIM_DRM_INTEL
-DIM_DRM_INTEL_REMOTE=${DIM_DRM_INTEL_REMOTE:-danvet}
+# name of the $drm_intel_ssh remote within $DIM_GVT_INTEL
+DIM_GVT_INTEL_REMOTE=${DIM_GVT_INTEL_REMOTE:-zhenyw}
 
-# name of the $drm_upstream_git remote within $DIM_DRM_INTEL
-DIM_DRM_UPSTREAM_REMOTE=${DIM_DRM_UPSTREAM_REMOTE:-airlied}
+# name of the $drm_upstream_git remote within $DIM_GVT_INTEL
+# match rerere/nightly.conf
+DIM_DRM_INTEL_UPSTREAM_REMOTE="drm-intel"
 
 # mail user agent. must support a subset of mutt(1) command line options:
 # usage: $DIM_MUA [-s subject] [-i file] [-c cc-addr] to-addr [...]
@@ -89,20 +94,30 @@ DIM_TEMPLATE_SIGNATURE=${DIM_TEMPLATE_SIGNATURE:-$HOME/.dim.template.signature}
 
 today=`date +%Y-%m-%d`
 
-drm_intel_ssh=ssh://git.freedesktop.org/git/drm-intel
-drm_intel_git=git://anongit.freedesktop.org/drm-intel
-drm_upstream_git=git://people.freedesktop.org/~airlied/linux
-sound_upstream_git=git://git.kernel.org/pub/scm/linux/kernel/git/tiwai/sound.git
-driver_core_upstream_git=git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/driver-core.git
-linux_upstream_git=git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
+gvt_intel_ssh=git@github.com:zhenyw/linux
+drm_intel_upstream_git=git://anongit.freedesktop.org/drm-intel
+
+#drm_upstream_git=git://people.freedesktop.org/~airlied/linux
+#sound_upstream_git=git://git.kernel.org/pub/scm/linux/kernel/git/tiwai/sound.git
+#driver_core_upstream_git=git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/driver-core.git
+#linux_upstream_git=git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
+
+vfio_upstream_git=https://github.com/awilliam/linux-vfio.git
+kvm_upstream_git=git://git.kernel.org/pub/scm/virt/kvm/kvm.git
 
 # email aliases
 addr_drm_maintainer="Dave Airlie <airlied@gmail.com>"
+addr_drm_intel_maintainer="Daniel Vetter <daniel.vetter@ffwll.ch>"
 addr_intel_gfx_maintainer1="Daniel Vetter <daniel.vetter@ffwll.ch>"
 addr_intel_gfx_maintainer2="Jani Nikula <jani.nikula@linux.intel.com>"
 addr_intel_gfx="intel-gfx@lists.freedesktop.org"
 addr_dri_devel="dri-devel@lists.freedesktop.org"
 addr_intel_qa="\"Christophe Prigent\" <christophe.prigent@intel.com>"
+
+# FIXME
+addr_gvt_maintainer1="\"Zhenyu Wang\" <zhenyuw@linux.intel.com>"
+addr_gvt_maintainer2=""
+addr_gvt_qa=""
 
 #
 # Command line options.
@@ -159,7 +174,7 @@ fi
 #
 
 if [ "$subcommand" != "setup" -a "$subcommand" != "help" -a "$subcommand" != "usage" ]; then
-	for d in $DIM_PREFIX $DIM_PREFIX/$DIM_DRM_INTEL $DIM_PREFIX/drm-intel-rerere $DIM_PREFIX/drm-intel-nightly; do
+	for d in $DIM_PREFIX $DIM_PREFIX/$DIM_GVT_INTEL $DIM_PREFIX/gvt-rerere $DIM_PREFIX/gvt-nightly; do
 		if [ ! -d $d ]; then
 			echo "$d is missing, please check your configuration and/or run dim setup"
 			exit 1
@@ -170,7 +185,7 @@ if [ "$subcommand" != "setup" -a "$subcommand" != "help" -a "$subcommand" != "us
 	# Internal configuration that depends on a sane setup.
 	#
 
-	dim_branches=`(source $DIM_PREFIX/drm-intel-rerere/nightly.conf ; echo $nightly_branches) | \
+	dim_branches=`(source $DIM_PREFIX/gvt-rerere/nightly.conf ; echo $nightly_branches) | \
 		xargs -n 1 echo | grep '^origin' | sed -e 's/^origin\///'`
 fi
 
@@ -199,28 +214,35 @@ function dim_commit_add_tag
 	done
 }
 
+# XXX double check with process
+# So we will have branches as below:
+# 'gvt-next' : normal next target for dinq
+# 'gvt-fixes' : normal fixes target for drm-intel-fixes
+# 'gvt-next-fixes' : 'gvt-next' fixes
 function update_linux_next
 {
-	cd $DIM_PREFIX/drm-intel-nightly
+	cd $DIM_PREFIX/gvt-nightly
 
-	# always update drm-intel-fixes
-	echo -n "Pushing drm-intel-fixes to for-linux-next-fixes... "
-	git push $DRY_RUN origin +origin/drm-intel-fixes:for-linux-next-fixes >& /dev/null
+	# XXX check, just push the specific branch?
+	
+	# always update gvt-fixes
+	echo -n "Pushing gvt-fixes to for-drm-intel-fixes... "
+	git push $DRY_RUN origin +origin/gvt-fixes:for-drm-intel-fixes >& /dev/null
 	echo "Done."
 
-	if git merge-base --is-ancestor origin/drm-intel-next-fixes origin/drm-intel-fixes ; then
+	if git merge-base --is-ancestor origin/gvt-next-fixes origin/gvt-fixes ; then
 		# -fixes has caught up to dinf, i.e. we're out of the merge
 		# window. Push the next queue.
-		echo -n "Out of merge window. Pushing drm-intel-next-queued to for-linux-next... "
-		git push $DRY_RUN origin +origin/drm-intel-next-queued:for-linux-next >& /dev/null
+		echo -n "Out of merge window. Pushing gvt-next to for-drm-intel-next-queued... "
+		git push $DRY_RUN origin +origin/gvt-next:for-drm-intel-next-queued >& /dev/null
 		echo "Done."
 	else
 		# dinf is ahead of -fixes, i.e. drm-next has already closed for
 		# the next merge window and we've started to gather new fixes
 		# for the current -next cycle. Push dinf
 
-		echo -n "Pushing drm-intel-next-fixes to for-linux-next... "
-		git push $DRY_RUN origin +origin/drm-intel-next-fixes:for-linux-next >& /dev/null
+		echo -n "Pushing gvt-next-fixes to for-drm-intel-next-fixes... "
+		git push $DRY_RUN origin +origin/gvt-next-fixes:for-drm-intel-next-fixes >& /dev/null
 		echo "Done."
 	fi
 }
@@ -238,20 +260,20 @@ function check_conflicts
 
 function update_rerere_cache
 {
-	cd $DIM_PREFIX/drm-intel-rerere/
+	cd $DIM_PREFIX/gvt-rerere/
 	git pull
-	cp rr-cache/* $DIM_PREFIX/drm-intel-nightly/.git/rr-cache/ -r
+	cp rr-cache/* $DIM_PREFIX/gvt-nightly/.git/rr-cache/ -r
 	cd -
 }
 
 function dim_rebuild_nightly
 {
-	local integration_branch=drm-intel-nightly
+	local integration_branch=gvt-nightly
 	local specfile=`mktemp`
 	local time="`date --utc +%Yy-%mm-%dd-%Hh-%Mm-%Ss` UTC"
 	local first=1
 
-	local rerere=$DIM_PREFIX/drm-intel-rerere
+	local rerere=$DIM_PREFIX/gvt-rerere
 
 	cd $rerere
 	if [[ `git status --porcelain | grep -v "^[ ?][ ?]" | wc -l` -gt 0 ]]; then
@@ -262,6 +284,7 @@ function dim_rebuild_nightly
 	update_rerere_cache >& /dev/null
 	echo "Done."
 
+	# pull $nightly_branches
 	source $rerere/nightly.conf
 
 	cd $DIM_PREFIX/$integration_branch
@@ -361,10 +384,10 @@ function dim_rebuild_nightly
 
 function dim_nightly_forget
 {
-	cd $DIM_PREFIX/drm-intel-nightly
+	cd $DIM_PREFIX/gvt-nightly
 	git fetch origin >& /dev/null
-	git reset --hard origin/drm-intel-next-queued >& /dev/null
-	git merge origin/drm-intel-fixes
+	git reset --hard origin/gvt-next >& /dev/null
+	git merge origin/gvt-fixes
 	git rerere forget
 }
 
@@ -382,27 +405,19 @@ function dim_push_branch
 
 	assert_branch $branch
 
-	git push $DRY_RUN $DIM_DRM_INTEL_REMOTE $branch "$@"
+	git push $DRY_RUN $DIM_GVT_INTEL_REMOTE $branch "$@"
 
 	dim_rebuild_nightly
 }
 
-dim_alias_pq=push-queued
-function dim_push_queued
+function dim_push_next
 {
-	dim_push_branch drm-intel-next-queued "$@"
+    dim_push_branch gvt-next "$@"
 }
 
-dim_alias_pnf=push-next-fixes
-function dim_push_next_fixes
-{
-	dim_push_branch drm-intel-next-fixes "$@"
-}
-
-dim_alias_pf=push-fixes
 function dim_push_fixes
 {
-	dim_push_branch drm-intel-fixes "$@"
+    dim_push_branch gvt-fixes "$@"
 }
 
 # ensure we're on branch $1, and apply patches. the rest of the arguments are
@@ -420,7 +435,8 @@ function dim_apply_branch
 
 	cat > $file
 
-	local message_id=$(message_get_id $file)
+	# ignore message_id for now
+#	local message_id=$(message_get_id $file)
 
 	local commiter_email=$(git config --get user.email)
 	local patch_from=$(grep "From:" "$file" | head -1)
@@ -431,33 +447,34 @@ function dim_apply_branch
 
 	cat $file | git am -3 $sob "$@"
 
-	if [ -n "$message_id" ]; then
-		dim_commit_add_tag "Link: http://patchwork.freedesktop.org/patch/msgid/$message_id"
-	else
-		echo "No message-id found in the patch file."
-	fi
+#	if [ -n "$message_id" ]; then
+#		dim_commit_add_tag "Link: http://patchwork.freedesktop.org/patch/msgid/$message_id"
+#	else
+#		echo "No message-id found in the patch file."
+#	fi
 
 	checkpatch_commit HEAD
 
 	eval $DRY $DIM_POST_APPLY_ACTION
 }
 
-dim_alias_aq=apply-queued
-function dim_apply_queued
+dim_alias_aq=apply-gvt-next
+function dim_apply_gvt_next
 {
-	dim_apply_branch drm-intel-next-queued "$@"
+	dim_apply_branch gvt-next "$@"
 }
 
-dim_alias_af=apply-fixes
-function dim_apply_fixes
+dim_alias_af=apply-gvt-fixes
+function dim_apply_gvt_fixes
 {
-	dim_apply_branch drm-intel-fixes "$@"
+	dim_apply_branch gvt-fixes "$@"
 }
 
-dim_alias_anf=apply-next-fixes
-function dim_apply_next_fixes
+# have this?
+dim_alias_anf=apply-gvt-next-fixes
+function dim_apply_gvt_next_fixes
 {
-	dim_apply_branch drm-intel-next-fixes "$@"
+	dim_apply_branch gvt-next-fixes "$@"
 }
 
 function dim_cherry_pick
@@ -470,25 +487,25 @@ function dim_cherry_pick
 	sha_short=${sha:0:8}
 
 	# need latest -nightly
-	git fetch $DIM_DRM_INTEL_REMOTE
+	git fetch $DIM_GVT_INTEL_REMOTE
 	echo Possible fixup patches for your cherry-pick:
-	git log --grep=$sha_short --pretty=oneline $sha..$DIM_DRM_INTEL_REMOTE/drm-intel-nightly
+	git log --grep=$sha_short --pretty=oneline $sha..$DIM_GVT_INTEL_REMOTE/gvt-nightly
 	$DRY git cherry-pick -s -x -e $1
 }
 
 function dim_cherry_pick_branch
 {
 	# Look for commits in dinq tagged as fixes.
-	for commit in $(git log --reverse --format=format:%h --grep="drm-intel-fixes@lists.freedesktop.org" --grep="stable@vger.kernel.org" origin/master..$DIM_DRM_INTEL_REMOTE/drm-intel-next-queued -- drivers/gpu/drm/i915); do
+	for commit in $(git log --reverse --format=format:%h --grep="drm-intel-fixes@lists.freedesktop.org" --grep="stable@vger.kernel.org" origin/master..$DIM_GVT_INTEL_REMOTE/gvt-next -- drivers/gpu/drm/i915); do
 		echo "Considering $(git --no-pager log --oneline -1 $commit)"
 		log=$(mktemp)
 
 		# Look at history for already cherry-picked fixes.
 		# Note: use *local* branches to account for unpushed commits.
-		git log drm-intel-fixes --after=12months --oneline \
+		git log gvt-fixes --after=12months --oneline \
 		    --grep="cherry picked .* $commit" > $log
 		if [ "$(cat $log)" = "" ]; then
-			git log drm-intel-next-fixes --after=12months --oneline \
+			git log gvt-next-fixes --after=12months --oneline \
 			    --grep="cherry picked .* $commit" > $log
 		fi
 
@@ -524,13 +541,13 @@ function dim_cherry_pick_branch
 
 function dim_cherry_pick_fixes
 {
-	assert_branch drm-intel-fixes
+	assert_branch gvt-fixes
 	dim_cherry_pick_branch "$@"
 }
 
 function dim_cherry_pick_next_fixes
 {
-	assert_branch drm-intel-next-fixes
+	assert_branch gvt-next-fixes
 	dim_cherry_pick_branch "$@"
 }
 
@@ -552,16 +569,18 @@ function dim_magic_rebase_resolve
 	git rebase --continue
 }
 
-dim_alias_ai=apply-igt
-function dim_apply_igt
-{
-	cd ~/xorg/intel-gpu-tools/
-	git am --whitespace=fix -3 -s
-}
+#dim_alias_ai=apply-igt
+#function dim_apply_igt
+#{
+#	cd ~/xorg/intel-gpu-tools/
+#	git am --whitespace=fix -3 -s
+#}
 
 dim_alias_mp=magic-patch
 function dim_magic_patch
 {
+    warn_or_fail "FIXME"
+    
 	if [[ "$1" = "-a" ]]; then
 		cd `cat ~/.dim-last-path`
 	fi
@@ -593,11 +612,11 @@ function dim_create_branch
 		start=$2
 	fi
 
-	cd $DIM_PREFIX/$DIM_DRM_INTEL
+	cd $DIM_PREFIX/$DIM_GVT_INTEL
 
 	$DRY git branch $branch $start
-	git push $DRY_RUN $DIM_DRM_INTEL_REMOTE +$branch --set-upstream
-	cd $DIM_PREFIX/drm-intel-rerere
+	git push $DRY_RUN $DIM_GVT_INTEL_REMOTE +$branch --set-upstream
+	cd $DIM_PREFIX/gvt-rerere
 	$DRY echo "nightly_branches=\"\$nightly_branches origin/$branch\"" \
 	     >> nightly.conf
 	$DRY git add nightly.conf
@@ -612,7 +631,7 @@ function dim_remove_branch
 	fi
 	branch=$1
 
-	cd $DIM_PREFIX/$DIM_DRM_INTEL
+	cd $DIM_PREFIX/$DIM_GVT_INTEL
 
 	if ! $DRY git branch -d $branch ; then
 		warn_or_fail "Can't remove $branch in working repo"
@@ -622,10 +641,10 @@ function dim_remove_branch
 		rm -R $DIM_PREFIX/$branch
 	fi
 
-	cd $DIM_PREFIX/drm-intel-nightly
+	cd $DIM_PREFIX/gvt-nightly
 	git push $DRY_RUN origin --delete $branch
 	$DRY git fetch origin --prune
-	cd $DIM_PREFIX/drm-intel-rerere
+	cd $DIM_PREFIX/gvt-rerere
 	full_branch="origin/$branch"
 	$DRY sed -e "/${full_branch//\//\\\/}/d" -i nightly.conf
 	$DRY git add nightly.conf
@@ -639,7 +658,7 @@ function dim_cd
 	if [[ -d $DIM_PREFIX/$1 ]] ; then
 		path=$DIM_PREFIX/$1
 	else
-		path=$DIM_PREFIX/$DIM_DRM_INTEL
+		path=$DIM_PREFIX/$DIM_GVT_INTEL
 	fi
 
 	echo $path > ~/.dim-last-path
@@ -656,25 +675,25 @@ function dim_checkout
 
 	dim_cd $1
 	if ! git branch | grep $1 > /dev/null ; then
-		git checkout -t $DIM_DRM_INTEL_REMOTE/$1
+		git checkout -t $DIM_GVT_INTEL_REMOTE/$1
 	else
 		git checkout $1
 	fi
 }
 
-function dim_conq
+function dim_con
 {
-	dim_checkout drm-intel-next-queued "$@"
+	dim_checkout gvt-next "$@"
 }
 
 function dim_cof
 {
-	dim_checkout drm-intel-fixes "$@"
+	dim_checkout gvt-fixes "$@"
 }
 
 function dim_conf
 {
-	dim_checkout drm-intel-next-fixes "$@"
+	dim_checkout gvt-next-fixes "$@"
 }
 
 # $1 is the git sha1 to check
@@ -691,7 +710,8 @@ function checkpatch_commit
 		warn_or_fail "New BUG macro added"
 	fi
 
-        if [ "$branch" = "drm-intel-next-queued" ]; then
+	# change for gvt-next
+        if [ "$branch" = "gvt-next" ]; then
 		local non_i915_files=$(git diff-tree --no-commit-id --name-only -r $commit | \
 			grep -v "^\(drivers/gpu/drm/i915/\|include/drm/i915\|include/uapi/drm/i915\)")
 
@@ -739,7 +759,7 @@ function prep_pull_mail_greetings
 		cat $DIM_TEMPLATE_HELLO
 	else
 		cat <<-EOF
-		Hi Dave,
+		Hi Daniel,
 
 		EOF
 	fi
@@ -752,7 +772,7 @@ function prep_pull_mail_signature
 	else
 		cat <<-EOF
 
-		Cheers, Daniel
+		Cheers,
 
 
 		EOF
@@ -808,12 +828,14 @@ function dim_create_workdir
 
 		if git help worktree &> /dev/null; then
 			# native worktree support was added in git 2.5
-			cd $DIM_DRM_INTEL
+			cd $DIM_GVT_INTEL
 			$DRY git worktree prune
 			$DRY git worktree add $DIM_PREFIX/$branch $branch
 			cd $DIM_PREFIX
 		else
-			$DRY git-new-workdir $DIM_DRM_INTEL $branch $branch
+		    #$DRY git-new-workdir $DIM_GVT_INTEL $branch $branch
+		    echo "Your git version doesn't support worktree"
+		    exit 1
 		fi
 	done
 }
@@ -821,7 +843,7 @@ function dim_create_workdir
 dim_alias_fw=for-each-workdirs
 function dim_for_each_workdirs
 {
-	cd $DIM_PREFIX/$DIM_DRM_INTEL
+	cd $DIM_PREFIX/$DIM_GVT_INTEL
 	$@
 	for branch in $dim_branches ; do
 		if [[ -d $DIM_PREFIX/$branch ]] ; then
@@ -833,52 +855,56 @@ function dim_for_each_workdirs
 
 function dim_update_next
 {
-	assert_branch drm-intel-next-queued
+	assert_branch gvt-next
 
 	git pull --ff-only
 
-	if ! git branch --merged $DIM_DRM_INTEL_REMOTE/drm-intel-nightly | grep drm-intel-fixes &> /dev/null ; then
-		echo "drm-intel-fixes not merged into -nigthly, please update!"
+	if ! git branch --merged $DIM_GVT_INTEL_REMOTE/gvt-nightly | grep gvt-fixes &> /dev/null ; then
+		echo "gvt-fixes not merged into -nigthly, please update!"
 		exit 2
 	fi
-	if ! git branch --merged $DIM_DRM_INTEL_REMOTE/drm-intel-nightly | grep drm-intel-next-queued &> /dev/null ; then
-		echo "drm-intel-next-queued not merged into -nigthly, please update!"
+	if ! git branch --merged $DIM_GVT_INTEL_REMOTE/gvt-nightly | grep gvt-next &> /dev/null ; then
+		echo "gvt-next not merged into -nigthly, please update!"
 		exit 2
 	fi
 
-	driver_date=`date +%Y%m%d`
-	$DRY sed -i -e "s/^#define DRIVER_DATE.*\"[0-9]*\"$/#define DRIVER_DATE\t\t\"$driver_date\"/" \
-	     drivers/gpu/drm/i915/i915_drv.h
-	$DRY git add drivers/gpu/drm/i915/i915_drv.h
-	echo -e "drm/i915: Update DRIVER_DATE to $driver_date\n\nSigned-off-by: Daniel Vetter <daniel.vetter@ffwll.ch>" | \
-		git commit -s -F -
+	# XXX driver date? disable for now
+#	driver_date=`date +%Y%m%d`
+#	$DRY sed -i -e "s/^#define DRIVER_DATE.*\"[0-9]*\"$/#define DRIVER_DATE\t\t\"$driver_date\"/" \
+#	     drivers/gpu/drm/i915/i915_drv.h
+#	$DRY git add drivers/gpu/drm/i915/i915_drv.h
+#	echo -e "drm/i915: Update DRIVER_DATE to $driver_date\n\nSigned-off-by: Daniel Vetter <daniel.vetter@ffwll.ch>" | \
+#		git commit -s -F -
 
-	gitk drm-intel-next-queued ^$DIM_DRM_UPSTREAM_REMOTE/drm-next &
+	gitk gvt-next ^$DIM_DRM_INTEL_UPSTREAM_REMOTE/drm-intel-next-queued &
 
-	# try to push dinq first in case someone raced
-	dim push-queued
+	# try to push gvt next first in case someone raced
+	dim push-next
 
 	dim_update_next_continue
 }
 
 function dim_update_next_continue
 {
-	assert_branch drm-intel-next-queued
+	assert_branch gvt-next
 
-	git push $DRY_RUN $DIM_DRM_INTEL_REMOTE drm-intel-next-queued:drm-intel-next
-	tag=drm-intel-next-$today
-	$DRY git tag -f -a $tag $DIM_DRM_INTEL_REMOTE/drm-intel-next
-	git push $DRY_RUN -f $DIM_DRM_INTEL_REMOTE $tag
+	# no next-queued for gvt yet
+	#git push $DRY_RUN $DIM_GVT_INTEL_REMOTE drm-intel-next-queued:drm-intel-next
 
-	echo "Updating -testing to latest -nightly"
-	git push $DRY_RUN $DIM_DRM_INTEL_REMOTE +$DIM_DRM_INTEL_REMOTE/drm-intel-nightly:drm-intel-testing
-	$DRY git tag -f drm-intel-testing-$today $DIM_DRM_INTEL_REMOTE/drm-intel-testing
-	$DRY git push -f $DIM_DRM_INTEL_REMOTE drm-intel-testing-$today
+	tag=gvt-next-$today
+	$DRY git tag -f -a $tag $DIM_GVT_INTEL_REMOTE/gvt-next
+	git push $DRY_RUN -f $DIM_GVT_INTEL_REMOTE $tag
+
+	# no testing for gvt yet, just nightly
+	#echo "Updating -testing to latest -nightly"
+	#git push $DRY_RUN $DIM_GVT_INTEL_REMOTE +$DIM_GVT_INTEL_REMOTE/drm-intel-nightly:drm-intel-testing
+	#$DRY git tag -f drm-intel-testing-$today $DIM_GVT_INTEL_REMOTE/drm-intel-testing
+	#$DRY git push -f $DIM_GVT_INTEL_REMOTE drm-intel-testing-$today
 
 	cat > ~/tmp/test-request <<-HERE
 		Hi all,
 
-		New -testing cycle with cool stuff:
+		New gvt-nightly cycle with cool stuff:
 		HERE
 	obj=`git rev-parse $tag`
 	if [[ `git cat-file -t $obj` == "tag" ]] ; then
@@ -890,30 +916,31 @@ function dim_update_next_continue
 
 		Happy testing!
 
-		Cheers, Daniel
+		Cheers,
 		HERE
 
-	$DRY $DIM_MUA -s "Updated drm-intel-testing" \
+	$DRY $DIM_MUA -s "Updated gvt-nightly" \
 	     -i ~/tmp/test-request \
-	     -c "$addr_intel_gfx" \
-	     -c "$addr_intel_gfx_maintainer1" \
-	     -c "$addr_intel_gfx_maintainer2" \
-	     "$addr_intel_qa"
+	     -c "$addr_gvt_maintainer1" \
+	     -c "$addr_gvt_maintainer2" \
+	     "$addr_gvt_qa"
 }
 
 function dim_tag_next
 {
-	cd $DIM_PREFIX/$DIM_DRM_INTEL
-	git fetch $DIM_DRM_INTEL_REMOTE
+	cd $DIM_PREFIX/$DIM_GVT_INTEL
+	git fetch $DIM_GVT_INTEL_REMOTE
 
-	if [ $(git rev-parse drm-intel-next) == $(git rev-parse drm-intel-next@{u}) ] ; then
+	#if [ $(git rev-parse drm-intel-next) == $(git rev-parse drm-intel-next@{u}) ] ; then
+	# As we only have one -next for gvt, so just tagging
+	if [ : ]; then
 		echo "Tagging current drm-intel-next"
 
-		tag=drm-intel-next-$today
-		$DRY git tag -f $tag $DIM_DRM_INTEL_REMOTE/drm-intel-next
-		git push $DRY_RUN -f $DIM_DRM_INTEL_REMOTE $tag
+		tag=gvt-next-$today
+		$DRY git tag -f $tag $DIM_GVT_INTEL_REMOTE/gvt-next
+		git push $DRY_RUN -f $DIM_GVT_INTEL_REMOTE $tag
 	else
-		echo "drm-intel-next not up-to-date, aborting"
+		echo "gvt-next not up-to-date, aborting"
 		exit
 	fi
 
@@ -930,61 +957,61 @@ function dim_pull_request
 	branch=$1
 	upstream=$2
 
-	if [ "$branch" != "drm-intel-next" ]; then
+	if [ "$branch" != "gvt-next" ]; then
 		assert_branch $branch
 	else
-		cd $DIM_PREFIX/$DIM_DRM_INTEL
+		cd $DIM_PREFIX/$DIM_GVT_INTEL
 	fi
 
 	git fetch ${upstream%%/*} >& /dev/null || true
 	echo "Using $upstream as the upstream"
 
-	if [ "$branch" = "drm-intel-next" ]; then
-		# drm-intel-next pulls have been tagged using dim update-next
-		drm_intel_next_tags=`git log $DIM_DRM_INTEL_REMOTE/drm-intel-next ^$upstream --decorate | grep "(.*tag: drm-intel-next-" | sed -e "s/^.*(.*tag: \(drm-intel-next-[^ ,]*\).*)$/\1/"`
-		prep_pull_mail $drm_intel_next_tags
-		tag=`git describe --all --exact $DIM_DRM_INTEL_REMOTE/drm-intel-next`
+	if [ "$branch" = "gvt-next" ]; then
+		# gvt-next pulls have been tagged using dim update-next
+		gvt_next_tags=`git log $DIM_GVT_INTEL_REMOTE/gvt-next ^$upstream --decorate | grep "(.*tag: gvt-next-" | sed -e "s/^.*(.*tag: \(gvt-next-[^ ,]*\).*)$/\1/"`
+		prep_pull_mail $gvt_next_tags
+		tag=`git describe --all --exact $DIM_GVT_INTEL_REMOTE/gvt-next`
 	else
 		tag=$branch-$today
-		$DRY git tag -f $tag $DIM_DRM_INTEL_REMOTE/$branch
-		$DRY git push -f $DIM_DRM_INTEL_REMOTE $tag
+		$DRY git tag -f $tag $DIM_GVT_INTEL_REMOTE/$branch
+		$DRY git push -f $DIM_GVT_INTEL_REMOTE $tag
 		prep_pull_mail
 	fi
 
-	git request-pull $upstream $drm_intel_git $tag >> ~/tmp/dim-pull-request
+	git request-pull $upstream $drm_intel_upstream_git $tag >> ~/tmp/dim-pull-request
 	$DRY $DIM_MUA -s "[PULL] $branch" \
 		-i ~/tmp/dim-pull-request \
 		-c "$addr_intel_gfx" \
 		-c "$addr_dri_devel" \
-		-c "$addr_intel_gfx_maintainer1" \
-		-c "$addr_intel_gfx_maintainer2" \
-		"$addr_drm_maintainer"
+		-c "$addr_gvt_maintainer1" \
+		-c "$addr_gvt_maintainer2" \
+		"$addr_drm_intel_maintainer"
 }
 
 function dim_pull_request_next
 {
-	upstream=${1:-$DIM_DRM_UPSTREAM_REMOTE/drm-next}
-	dim_pull_request drm-intel-next $upstream
+	upstream=${1:-$DIM_DRM_INTEL_UPSTREAM_REMOTE/gvt-next}
+	dim_pull_request gvt-next $upstream
 }
 
 function dim_pull_request_fixes
 {
-	upstream=${1:-origin/master}
-	dim_pull_request drm-intel-fixes $upstream
+	upstream=${1:-$DIM_DRM_INTEL_UPSTREAM_REMOTE/gvt-fixes}
+	dim_pull_request gvt-fixes $upstream
 }
 
 function dim_pull_request_next_fixes
 {
-	upstream=${1:-$DIM_DRM_UPSTREAM_REMOTE/drm-next}
-	dim_pull_request drm-intel-next-fixes $upstream
+	upstream=${1:-$DIM_DRM_INTEL_UPSTREAM_REMOTE/gvt-next-fixes}
+	dim_pull_request gvt-next-fixes $upstream
 }
 
 # Note: used by bash completion
 function dim_list_upstreams
 {
 	echo origin/master
-	echo $DIM_DRM_UPSTREAM_REMOTE/drm-next
-	echo $DIM_DRM_UPSTREAM_REMOTE/drm-fixes
+	echo $DIM_DRM_INTEL_UPSTREAM_REMOTE/gvt-next
+	echo $DIM_DRM_INTEL_UPSTREAM_REMOTE/gvt-fixes
 }
 
 # Note: used by bash completion
@@ -996,8 +1023,8 @@ function dim_list_branches
 dim_alias_ub=update-branches
 function dim_update_branches
 {
-	cd $DIM_PREFIX/$DIM_DRM_INTEL
-	for remote in $DIM_DRM_INTEL_REMOTE $DIM_DRM_UPSTREAM_REMOTE origin; do
+	cd $DIM_PREFIX/$DIM_GVT_INTEL
+	for remote in $DIM_GVT_INTEL_REMOTE $DIM_DRM_INTEL_UPSTREAM_REMOTE origin; do
 		git fetch $remote
 	done
 
@@ -1005,14 +1032,14 @@ function dim_update_branches
 
 	for branch in $dim_branches ; do
 		dim_checkout $branch
-		if git diff --quiet $DIM_DRM_INTEL_REMOTE/$branch; then
+		if git diff --quiet $DIM_GVT_INTEL_REMOTE/$branch; then
 			$DRY git rebase
 		else
 			$DRY git rebase -i
 		fi
 	done
-	dim_checkout drm-intel-next
-	$DRY git reset --hard $DIM_DRM_INTEL_REMOTE/drm-intel-next
+	dim_checkout gvt-next
+	$DRY git reset --hard $DIM_GVT_INTEL_REMOTE/gvt-next
 	# TODO: Restore -nightly merge state from the rerere-cache
 	# branch
 	update_rerere_cache
@@ -1028,87 +1055,87 @@ function dim_setup
 	fi
 	cd $DIM_PREFIX
 
-	if [ ! -d $DIM_PREFIX/$DIM_DRM_INTEL ]; then
-		echo "please set up your maintainer linux repository at $DIM_PREFIX/$DIM_DRM_INTEL with:"
+	if [ ! -d $DIM_PREFIX/$DIM_GVT_INTEL ]; then
+		echo "please set up your maintainer linux repository at $DIM_PREFIX/$DIM_GVT_INTEL with:"
 		echo "    cd $DIM_PREFIX"
-		echo "    git clone $linux_upstream_git $DIM_DRM_INTEL"
+		echo "    git clone $linux_upstream_git $DIM_GVT_INTEL"
 		echo "or update your configuration."
 		exit 1
 	fi
-	cd $DIM_DRM_INTEL
+	cd $DIM_GVT_INTEL
 	if ! git remote -v | grep "^origin[[:space:]]" | grep $linux_upstream_git > /dev/null; then
 		echo "please set up remote origin for $linux_upstream_git"
 		exit 1
 	fi
-	if ! git remote -v | grep "^$DIM_DRM_INTEL_REMOTE[[:space:]]" | grep $drm_intel_ssh > /dev/null; then
-		echo "please set up remote $DIM_DRM_INTEL_REMOTE for $drm_intel_ssh with:"
-		echo "    git remote add $DIM_DRM_INTEL_REMOTE $drm_intel_ssh"
+	if ! git remote -v | grep "^$DIM_GVT_INTEL_REMOTE[[:space:]]" | grep $gvt_intel_ssh > /dev/null; then
+		echo "please set up remote $DIM_GVT_INTEL_REMOTE for $gvt_intel_ssh with:"
+		echo "    git remote add $DIM_GVT_INTEL_REMOTE $gvt_intel_ssh"
 		echo "or update your configuration."
 		exit 1
 	fi
-	if ! git remote -v | grep "^$DIM_DRM_UPSTREAM_REMOTE[[:space:]]" | grep $drm_upstream_git > /dev/null; then
-		echo "please set up remote $DIM_DRM_UPSTREAM_REMOTE for $drm_upstream_git with:"
-		echo "    git remote add $DIM_DRM_UPSTREAM_REMOTE $drm_upstream_git"
+
+	if ! git remote -v | grep "^$DIM_DRM_INTEL_UPSTREAM_REMOTE[[:space:]]" | grep $drm_intel_upstream_git > /dev/null; then
+		echo "please set up remote $DIM_DRM_INTEL_UPSTREAM_REMOTE for $drm_intel_upstream_git with:"
+		echo "    git remote add $DIM_DRM_INTEL_UPSTREAM_REMOTE $drm_intel_upstream_git"
 		echo "or update your configuration."
 		exit 1
 	fi
 	cd ..
 
+	# maintainer tools : might seperate from kernel tree?
 	echo "Setting up maintainer-tools ..."
 	if [ ! -d maintainer-tools ]; then
-		git clone --reference=$DIM_PREFIX/$DIM_DRM_INTEL/.git $drm_intel_ssh maintainer-tools
+		git clone --reference=$DIM_PREFIX/$DIM_GVT_INTEL/.git $gvt_intel_ssh maintainer-tools
 	fi
 	cd maintainer-tools
-	git config remote.origin.url $drm_intel_ssh
-	echo "$DIM_PREFIX/$DIM_DRM_INTEL/.git/objects" > .git/objects/info/alternates
+	git config remote.origin.url $gvt_intel_ssh
+	echo "$DIM_PREFIX/$DIM_GVT_INTEL/.git/objects" > .git/objects/info/alternates
 	git repack -a -d -l
 	if ! git branch | grep maintainer-tools > /dev/null ; then
 		git checkout -t origin/maintainer-tools
 	fi
 	cd ..
 
-	echo "Setting up drm-intel-rerere ..."
-	if [ ! -d drm-intel-rerere ]; then
-		git clone --reference=$DIM_PREFIX/$DIM_DRM_INTEL/.git $drm_intel_ssh drm-intel-rerere
+	echo "Setting up gvt-rerere ..."
+	if [ ! -d gvt-rerere ]; then
+		git clone --reference=$DIM_PREFIX/$DIM_GVT_INTEL/.git $gvt_intel_ssh gvt-rerere
 	fi
-	cd drm-intel-rerere
-	git config remote.origin.url $drm_intel_ssh
-	echo "$DIM_PREFIX/$DIM_DRM_INTEL/.git/objects" > .git/objects/info/alternates
+	cd gvt-rerere
+	git config remote.origin.url $gvt_intel_ssh
+	echo "$DIM_PREFIX/$DIM_GVT_INTEL/.git/objects" > .git/objects/info/alternates
 	git repack -a -d -l
 	if ! git branch | grep rerere-cache > /dev/null ; then
 		git checkout -t origin/rerere-cache
 	fi
 	cd ..
 
-	echo "Setting up drm-intel-nightly ..."
-	if [ ! -d drm-intel-nightly ]; then
-		git clone --reference=$DIM_PREFIX/$DIM_DRM_INTEL/.git $drm_intel_ssh drm-intel-nightly
+	echo "Setting up gvt-nightly ..."
+	if [ ! -d gvt-nightly ]; then
+		git clone --reference=$DIM_PREFIX/$DIM_GVT_INTEL/.git $gvt_intel_ssh gvt-nightly
 	fi
-	cd drm-intel-nightly
+	cd gvt-nightly
 	mkdir -p .git/rr-cache
-	git config remote.origin.url $drm_intel_ssh
-	echo "$DIM_PREFIX/$DIM_DRM_INTEL/.git/objects" > .git/objects/info/alternates
+	git config remote.origin.url $gvt_intel_ssh
+	echo "$DIM_PREFIX/$DIM_GVT_INTEL/.git/objects" > .git/objects/info/alternates
 	git repack -a -d -l
-	if ! git branch | grep drm-intel-nightly > /dev/null ; then
-		git checkout -t origin/drm-intel-nightly
+	if ! git branch | grep gvt-nightly > /dev/null ; then
+		git checkout -t origin/gvt-nightly
 	fi
-	if git remote | grep drm-upstream > /dev/null ; then
-		git config remote.drm-upstream.url $drm_upstream_git
+	# check our upstreams
+
+	if git remote | grep vfio-upstream > /dev/null ; then
+		git config remote.vfio-upstream.url $vfio_upstream_git
 	else
-		git remote add drm-upstream $drm_upstream_git
-	fi
-	if git remote | grep sound-upstream > /dev/null ; then
-		git config remote.sound-upstream.url $sound_upstream_git
-	else
-		git remote add sound-upstream $sound_upstream_git
-	fi
-	if git remote | grep driver-core-upstream > /dev/null ; then
-		git config remote.driver-core-upstream.url $driver_core_upstream_git
-	else
-		git remote add driver-core-upstream $driver_core_upstream_git
+		git remote add vfio-upstream $vfio_upstream_git
 	fi
 
-	echo "dim setup successfully completed!"
+	if git remote | grep kvm-upstream > /dev/null ; then
+		git config remote.kvm-upstream.url $kvm_upstream_git
+	else
+		git remote add kvm-upstream $kvm_upstream_git
+	fi
+
+	echo "gvt dim setup successfully completed!"
 }
 
 function assert_branch
@@ -1149,29 +1176,30 @@ function dim_list_aliases
 
 function dim_cat_to_fixup
 {
-	cd $DIM_PREFIX/drm-intel-nightly
+	cd $DIM_PREFIX/gvt-nightly
 	cat > `cat .fixup_file_path`
 }
 
+#tag contains $1
 function dim_tc
 {
-	cd $DIM_PREFIX/$DIM_DRM_INTEL
+	cd $DIM_PREFIX/$DIM_GVT_INTEL
 	local tag=$(git tag --contains $1 | grep ^v | sort -V | head -n 1)
 	if [[ -n "$tag" ]]; then
 		echo "$tag"
 	else
 		# not in a tagged release, show upstream branches
 		git branch -r --contains $1 \
-		    $DIM_DRM_INTEL_REMOTE/* \
-		    $DIM_DRM_UPSTREAM_REMOTE/drm-next \
-		    $DIM_DRM_UPSTREAM_REMOTE/drm-fixes \
+		    $DIM_GVT_INTEL_REMOTE/* \
+		    $DIM_DRM_INTEL_UPSTREAM_REMOTE/gvt-next \
+		    $DIM_DRM_INTEL_UPSTREAM_REMOTE/gvt-fixes \
 		    origin/master | sed 's/^ *//'
 	fi
 }
 
 function dim_fixes
 {
-	cd $DIM_PREFIX/$DIM_DRM_INTEL
+	cd $DIM_PREFIX/$DIM_GVT_INTEL
 	local sha1=$1
 
 	git log -1 $sha1 "--pretty=format:Fixes: %H (\"%s\")%n" | \
@@ -1185,9 +1213,9 @@ function dim_fixes
 			echo Cc: stable@vger.kernel.org
 		fi
 	else
-		git fetch $DIM_DRM_INTEL_REMOTE
+		git fetch $DIM_GVT_INTEL_REMOTE
 		# Check whether it's already in a feature pile tag
-		if git merge-base --is-ancestor $sha1 $DIM_DRM_INTEL_REMOTE/drm-intel-next ; then
+		if git merge-base --is-ancestor $sha1 $DIM_GVT_INTEL_REMOTE/gvt-next ; then
 			# Make sure we're in the critical window where we might
 			# need to cherry-pick to dinf. critical window is -rc5
 			# up to end of merge window, hence exclude if in -rc1
