@@ -362,7 +362,7 @@ function dim_rebuild_nightly
 
 	echo -n "Updating rerere cache... "
 	cd $rerere
-	if git branch | grep rerere-cache | grep '\*' >& /dev/null ; then
+	if git branch | grep gvt-rerere-cache | grep '\*' >& /dev/null ; then
 		git pull >& /dev/null
 		cp $DIM_PREFIX/$integration_branch/.git/rr-cache/* rr-cache -r
 		git add *.patch >& /dev/null || true
@@ -375,7 +375,7 @@ function dim_rebuild_nightly
 		echo -n "Pushing rerere cache... "
 		git push $DRY_RUN origin HEAD >& /dev/null && echo "Done."
 	else
-		echo "Fail: Branch setup for the rerere-cache is borked."
+		echo "Fail: Branch setup for the gvt-rerere-cache is borked."
 		exit 1
 	fi
 
@@ -1104,8 +1104,8 @@ function dim_setup
 	git config remote.origin.url $gvt_intel_ssh
 	echo "$DIM_PREFIX/$DIM_GVT_INTEL/.git/objects" > .git/objects/info/alternates
 	git repack -a -d -l
-	if ! git branch | grep rerere-cache > /dev/null ; then
-		git checkout -t origin/rerere-cache
+	if ! git branch | grep gvt-rerere-cache > /dev/null ; then
+		git checkout -t origin/gvt-rerere-cache
 	fi
 	cd ..
 
