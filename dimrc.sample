@@ -8,15 +8,11 @@
 #DIM_PREFIX=$HOME/linux
 
 # Name of the main maintainer repo under $DIM_PREFIX.
-#DIM_DRM_INTEL=src
+#DIM_GVT_LINUX=src
 
 # Name of the remote for ssh://git.freedesktop.org/git/drm-intel within
 # $DIM_DRM_INTEL
-#DIM_DRM_INTEL_REMOTE=danvet
-
-# Name of the remote for git://people.freedesktop.org/~airlied/linux
-# within $DIM_DRM_INTEL
-#DIM_DRM_UPSTREAM_REMOTE=airlied
+#DIM_GVT_INTEL_REMOTE=danvet
 
 # Mail User Agent supporting a subset of mutt(1) command line options:
 # [-s subject] [-i file] [-c cc-addr] to-addr [...]
@@ -24,3 +20,5 @@
 
 # Command to run after dim apply
 #DIM_POST_APPLY_ACTION=
+
+# You may also need to add your git proxy setting here for working inside intel network
