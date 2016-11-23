@@ -186,8 +186,9 @@ if [ "$subcommand" != "setup" -a "$subcommand" != "help" -a "$subcommand" != "us
 	# Internal configuration that depends on a sane setup.
 	#
 
-	dim_branches=`(source $DIM_PREFIX/gvt-rerere/staging.conf ; echo $staging_branches) | \
+	dim_branches=`(source $DIM_PREFIX/staging.conf ; echo $staging_branches) | \
 		xargs -n 1 echo | grep '^origin' | sed -e 's/^origin\///'`
+
 fi
 
 # get message id from file
@@ -268,23 +269,25 @@ function dim_rebuild_staging
 {
 	local integration_branch=gvt-staging
 	local specfile=`mktemp`
-	local time="`date --utc +%Yy-%mm-%dd-%Hh-%Mm-%Ss` UTC"
+	local time="`date +%Yy-%mm-%dd-%Hh-%Mm-%Ss`"
+	local commit_time="$time CST"
 	local first=1
 
-	local rerere=$DIM_PREFIX/gvt-rerere
+	#local rerere=$DIM_PREFIX/gvt-rerere
 
-	cd $rerere
-	if [[ `git status --porcelain | grep -v "^[ ?][ ?]" | wc -l` -gt 0 ]]; then
-		warn_or_fail "-staging configuration file not commited"
-	fi
+	#cd $rerere
+	#if [[ `git status --porcelain | grep -v "^[ ?][ ?]" | wc -l` -gt 0 ]]; then
+	#	warn_or_fail "-staging configuration file not commited"
+	#fi
 
-	echo -n "Updating rerere cache and staging.conf... "
-	update_rerere_cache >& /dev/null
-	echo "Done."
+	#echo -n "Updating rerere cache and staging.conf... "
+	#update_rerere_cache >& /dev/null
+	#echo "Done."
 
 	# pull $staging_branches
-	source $rerere/staging.conf
-
+	#source $rerere/staging.conf
+	source $DIM_PREFIX/staging.conf
+	
 	cd $DIM_PREFIX/$integration_branch
 	if ! git branch | grep $integration_branch | grep '\*' >& /dev/null ; then
 		echo "Branch setup for the integration repo is borked"
@@ -292,9 +295,10 @@ function dim_rebuild_staging
 	fi
 
 	for remote in $(echo $staging_branches | tr " " "\n" | sed 's|/.*$||g' | sort -u); do
-		echo -n "Fetching $remote... "
+		echo "Fetching $remote... "
 		# git fetch returns 128 if there's nothing to be fetched
-		git fetch $remote >& /dev/null || true
+		#git fetch $remote >& /dev/null || true
+		git fetch $remote || true
 		echo "Done."
 	done
 
@@ -318,7 +322,7 @@ function dim_rebuild_staging
 		fi
 
 		if [ $first == 1 ] ; then
-			echo "Reset. Done."
+			echo "Reset $sha1. Done."
 			git reset --hard $sha1 >& /dev/null
 			first=0
 		elif git merge --rerere-autoupdate --ff-only $sha1 >& /dev/null ; then
@@ -349,35 +353,40 @@ function dim_rebuild_staging
 		$INTERACTIVE
 	done
 
-	echo -n "Adding integration manifest $integration_branch: $time... "
+	echo -n "Adding integration manifest $integration_branch: $commit_time... "
 	mv $specfile integration-manifest
 	git add integration-manifest
-	git commit --quiet -m "$integration_branch: $time integration manifest"
+	git commit --quiet -m "$integration_branch: $commit_time integration manifest"
 	echo "Done."
 
-	echo -n "Pushing $integration_branch... "
+	echo "Pushing $integration_branch... "
+	$INTERACTIVE
 	git push $DRY_RUN origin +HEAD >& /dev/null && echo "Done." || echo "Fail"
 
-	echo -n "Updating rerere cache... "
-	cd $rerere
-	if git branch | grep gvt-rerere-cache | grep '\*' >& /dev/null ; then
-		git pull >& /dev/null
-		cp $DIM_PREFIX/$integration_branch/.git/rr-cache/* rr-cache -r
-		git add *.patch >& /dev/null || true
-		git add rr-cache/* > /dev/null
-		if git commit -m "$time: $integration_branch rerere cache update" >& /dev/null; then
-			echo -n "New commit. "
-		else
-			echo -n "Nothing changed. "
-		fi
-		echo -n "Pushing rerere cache... "
-		git push $DRY_RUN origin HEAD >& /dev/null && echo "Done." || echo "Fail"
-	else
-		echo "Fail: Branch setup for the gvt-rerere-cache is borked."
-		exit 1
-	fi
+	echo -n "Tagging: $time... "
+	git tag gvt-staging-$time
+	git push $DRY_RUN origin gvt-staging-$time >& /dev/null && echo "Done." || echo "Fail"
 
-	update_linux_next
+	#echo -n "Updating rerere cache... "
+	#cd $rerere
+	#if git branch | grep gvt-rerere-cache | grep '\*' >& /dev/null ; then
+	#	git pull >& /dev/null
+	#	cp $DIM_PREFIX/$integration_branch/.git/rr-cache/* rr-cache -r
+	#	git add *.patch >& /dev/null || true
+	#	git add rr-cache/* > /dev/null
+	#	if git commit -m "$time: $integration_branch rerere cache update" >& /dev/null; then
+	#		echo -n "New commit. "
+	#	else
+	#		echo -n "Nothing changed. "
+	#	fi
+	#	echo -n "Pushing rerere cache... "
+	#	git push $DRY_RUN origin HEAD >& /dev/null && echo "Done." || echo "Fail"
+	#else
+	#	echo "Fail: Branch setup for the gvt-rerere-cache is borked."
+	#	exit 1
+	#fi
+
+	#update_linux_next
 }
 
 function dim_staging_forget
@@ -1065,6 +1074,7 @@ function dim_setup
 		echo "please set up remote origin for $gvt_linux_git"
 		exit 1
 	fi
+	
 	if ! git remote -v | grep "^$DIM_GVT_LINUX_REMOTE[[:space:]]" | grep $gvt_linux_git > /dev/null; then
 		echo "please set up remote $DIM_GVT_LINUX_REMOTE for $gvt_linux_git with:"
 		echo "    git remote add $DIM_GVT_LINUX_REMOTE $gvt_linux_git"
@@ -1136,6 +1146,8 @@ function dim_setup
 	else
 		git remote add kvm-upstream $kvm_upstream_git
 	fi
+
+	echo "staging_branches=\"drm-intel/drm-intel-nightly kvm-upstream/queue vfio-upstream/next origin/gvt-next\"" > $DIM_PREFIX/staging.conf
 
 	echo "gvt dim setup successfully completed!"
 }
