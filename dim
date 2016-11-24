@@ -363,7 +363,7 @@ function dim_rebuild_staging
 	$INTERACTIVE
 	git push $DRY_RUN origin +HEAD >& /dev/null && echo "Done." || echo "Fail"
 
-	echo -n "Tagging: $time... "
+	echo "Tagging: $time... "
 	git tag gvt-staging-$time
 	git push $DRY_RUN origin gvt-staging-$time >& /dev/null && echo "Done." || echo "Fail"
 
@@ -486,6 +486,8 @@ function dim_apply_gvt_next_fixes
 
 function dim_cherry_pick
 {
+    warn_or_fail "FIXME"
+
 	if [[ "x$1" = "x" ]]; then
 		echo "usage: $0 $subcommand commit-ish"
 		exit 1
@@ -502,6 +504,8 @@ function dim_cherry_pick
 
 function dim_cherry_pick_branch
 {
+    warn_or_fail "FIXME"
+    
 	# Look for commits in dinq tagged as fixes.
 	for commit in $(git log --reverse --format=format:%h --grep="drm-intel-fixes@lists.freedesktop.org" --grep="stable@vger.kernel.org" origin/master..$DIM_GVT_LINUX_REMOTE/gvt-next -- drivers/gpu/drm/i915); do
 		echo "Considering $(git --no-pager log --oneline -1 $commit)"
@@ -623,11 +627,12 @@ function dim_create_branch
 
 	$DRY git branch $branch $start
 	git push $DRY_RUN $DIM_GVT_LINUX_REMOTE +$branch --set-upstream
-	cd $DIM_PREFIX/gvt-rerere
+	#cd $DIM_PREFIX/gvt-rerere
+	cd $DIM_PREFIX
 	$DRY echo "staging_branches=\"\$staging_branches origin/$branch\"" \
 	     >> staging.conf
-	$DRY git add staging.conf
-	$DRY git commit --quiet -m "Adding $branch to -staging"
+	#$DRY git add staging.conf
+	#$DRY git commit --quiet -m "Adding $branch to -staging"
 }
 
 function dim_remove_branch
@@ -651,11 +656,12 @@ function dim_remove_branch
 	cd $DIM_PREFIX/gvt-staging
 	git push $DRY_RUN origin --delete $branch
 	$DRY git fetch origin --prune
-	cd $DIM_PREFIX/gvt-rerere
+	#cd $DIM_PREFIX/gvt-rerere
+	cd $DIM_PREFIX
 	full_branch="origin/$branch"
 	$DRY sed -e "/${full_branch//\//\\\/}/d" -i staging.conf
-	$DRY git add staging.conf
-	$DRY git commit --quiet -m "Deleted $branch and removed from -staging"
+	#$DRY git add staging.conf
+	#$DRY git commit --quiet -m "Deleted $branch and removed from -staging"
 }
 
 function dim_cd
@@ -935,6 +941,8 @@ function dim_update_next_continue
 
 function dim_tag_next
 {
+    warn_or_fail "FIXME"
+    
 	cd $DIM_PREFIX/$DIM_GVT_LINUX
 	git fetch $DIM_GVT_LINUX_REMOTE
 
@@ -956,7 +964,9 @@ function dim_tag_next
 # dim_pull_request branch upstream
 function dim_pull_request
 {
-	if [[ "x$1" = "x" || "x$2" = "x" ]]; then
+    warn_or_fail "FIXME"
+
+        if [[ "x$1" = "x" || "x$2" = "x" ]]; then
 		echo "usage: $0 $subcommand branch upstream"
 		exit 1
 	fi
