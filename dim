@@ -76,6 +76,9 @@ DIM_GVT_LINUX_REMOTE=${DIM_GVT_LINUX_REMOTE:-origin}
 # match rerere/staging.conf
 DIM_DRM_INTEL_UPSTREAM_REMOTE="drm-intel"
 
+# name of $drm_tip_upstream_git remote
+DIM_DRM_TIP_UPSTREAM_REMOTE="drm-tip"
+
 # mail user agent. must support a subset of mutt(1) command line options:
 # usage: $DIM_MUA [-s subject] [-i file] [-c cc-addr] to-addr [...]
 DIM_MUA=${DIM_MUA:-mutt}
@@ -102,6 +105,7 @@ linux_upstream_git=git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.
 
 gvt_linux_git=https://github.com/01org/gvt-linux
 drm_intel_upstream_git=git://anongit.freedesktop.org/drm-intel
+drm_tip_upstream_git=git://anongit.freedesktop.org/drm/drm-tip
 vfio_upstream_git=https://github.com/awilliam/linux-vfio.git
 kvm_upstream_git=git://git.kernel.org/pub/scm/virt/kvm/kvm.git
 
@@ -868,7 +872,9 @@ function dim_for_each_workdirs
 
 function dim_update_next
 {
-	assert_branch gvt-next
+    warn_or_fail "FIXME"
+
+        assert_branch gvt-next
 
 	git pull --ff-only
 
@@ -1098,6 +1104,14 @@ function dim_setup
 		echo "or update your configuration."
 		exit 1
 	fi
+
+	if ! git remote -v | grep "^$DIM_DRM_TIP_UPSTREAM_REMOTE[[:space:]]" | grep $drm_tip_upstream_git > /dev/null; then
+		echo "please set up remote $DIM_DRM_TIP_UPSTREAM_REMOTE for $drm_tip_upstream_git with:"
+		echo "    git remote add $DIM_DRM_TIP_UPSTREAM_REMOTE $drm_tip_upstream_git"
+		echo "or update your configuration."
+		exit 1
+	fi
+
 	cd ..
 
 	# maintainer tools : might seperate from kernel tree?
@@ -1145,6 +1159,12 @@ function dim_setup
 	else
 	        git remote add $DIM_DRM_INTEL_UPSTREAM_REMOTE $drm_intel_upstream_git
 	fi
+	if git remote | grep $DIM_DRM_TIP_UPSTREAM_REMOTE > /dev/null ; then
+	        git config remote.$DIM_DRM_TIP_UPSTREAM_REMOTE.url $drm_tip_upstream_git
+	else
+	        git remote add $DIM_DRM_TIP_UPSTREAM_REMOTE $drm_tip_upstream_git
+	fi
+
 	if git remote | grep vfio-upstream > /dev/null ; then
 		git config remote.vfio-upstream.url $vfio_upstream_git
 	else
@@ -1157,7 +1177,7 @@ function dim_setup
 		git remote add kvm-upstream $kvm_upstream_git
 	fi
 
-	echo "staging_branches=\"drm-intel/drm-intel-nightly kvm-upstream/queue vfio-upstream/next origin/gvt-next\"" > $DIM_PREFIX/staging.conf
+	echo "staging_branches=\"drm-tip/drm-tip kvm-upstream/queue vfio-upstream/next origin/gvt-next\"" > $DIM_PREFIX/staging.conf
 
 	echo "gvt dim setup successfully completed!"
 }
