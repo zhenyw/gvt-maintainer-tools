@@ -418,7 +418,7 @@ function dim_push_branch
 
 	git push $DRY_RUN $DIM_GVT_LINUX_REMOTE $branch "$@"
 
-	dim_rebuild_staging
+	#dim_rebuild_staging
 }
 
 function dim_push_next
