@@ -334,8 +334,10 @@ function dim_rebuild_staging
 			echo "Fast-forward. Done."
 			true
 		else
-			local fixup_file=$rerere/$integration_branch-$name-fixup.patch
+			local fixup_file=$integration_branch-$name-fixup.patch
 
+			echo "checking..$fixup_file"
+			
 			echo $fixup_file > .fixup_file_path
 
 			git merge --rerere-autoupdate --no-commit $sha1 >& /dev/null || true
