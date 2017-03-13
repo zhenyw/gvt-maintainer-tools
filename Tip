@@ -1,0 +1,7 @@
+
+- merge conflict resolving for gvt staging
+
+  When merge conflict occurs, could just commit merge with conflict then
+  try to resolve it, save the resolving patch to specific name that script
+  is searching for, put the resolving patch under gvt-staging directory.
+  
