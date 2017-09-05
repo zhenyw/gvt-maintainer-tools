@@ -293,8 +293,9 @@ function dim_rebuild_staging
 	source $DIM_PREFIX/staging.conf
 	
 	cd $DIM_PREFIX/$integration_branch
+
 	if ! git branch | grep $integration_branch | grep '\*' >& /dev/null ; then
-		echo "Branch setup for the integration repo is borked"
+		echo "Branch setup for the integration repo is borked(not on $integration_branch?)"
 		exit 1
 	fi
 
@@ -423,14 +424,19 @@ function dim_push_branch
 	#dim_rebuild_staging
 }
 
-function dim_push_next
+function dim_push_gvt_next
 {
     dim_push_branch gvt-next "$@"
 }
 
-function dim_push_fixes
+function dim_push_gvt_fixes
 {
     dim_push_branch gvt-fixes "$@"
+}
+
+function dim_push_gvt_next_fixes
+{
+    dim_push_branch gvt-next-fixes "$@"
 }
 
 # ensure we're on branch $1, and apply patches. the rest of the arguments are
