@@ -120,8 +120,8 @@ addr_intel_qa="\"Christophe Prigent\" <christophe.prigent@intel.com>"
 
 # FIXME
 addr_gvt_maintainer1="\"Zhenyu Wang\" <zhenyuw@linux.intel.com>"
-addr_gvt_maintainer2=""
-addr_gvt_qa=""
+addr_gvt_maintainer2="zhi.a.wang@intel.com"
+addr_gvt_qa="intel-gvt@eclists.intel.com"
 
 #
 # Command line options.
@@ -269,6 +269,60 @@ function update_rerere_cache
 	cd -
 }
 
+function dim_rebase_xengt
+{
+    local integration_branch=gvt-staging
+    local xengt_branch=topic/gvt-xengt
+    local time="`date +%Yy-%mm-%dd-%Hh-%Mm-%Ss`"
+
+    cd $DIM_PREFIX/$integration_branch
+
+    git fetch origin 
+    if git branch | grep $xengt_branch >& /dev/null; then
+	echo "remove old branch"
+	git branch -D $xengt_branch
+    fi
+    git branch $xengt_branch origin/$xengt_branch
+    git checkout $xengt_branch
+
+    if ! git rebase origin/$integration_branch ; then
+	echo "topic/gvt-xengt failed to rebase onto gvt-staging"
+	#ignore error now
+	cat >> /tmp/xengt-error <<-HERE
+
+		topic/gvt-xengt failed to rebase to latest gvt-staging branch.
+
+		conflicts:
+
+		HERE
+	git diff >> /tmp/xengt-error
+
+	$DRY $DIM_MUA -s "[INFO] topic/gvt-xengt fail to rebase on gvt-staging" \
+	     -i /tmp/xengt-error \
+	     -c "$addr_gvt_maintainer1" \
+	     -c "$addr_gvt_maintainer2" \
+	     -c "xiong.y.zhang@intel.com" \
+	     "$addr_gvt_qa"
+
+	git rebase --abort
+	git reset --hard
+    else
+	echo "Tagging gvt-xengt-$time"
+	git tag gvt-xengt-$time
+	git push $DRY_RUN origin +HEAD >& /dev/null && echo "Done." || echo "Fail"
+	git push $DRY_RUN origin gvt-xengt-$time >& /dev/null && echo "Done." || echo "Fail"
+
+	$DRY $DIM_MUA -s "[INFO] New gvt-xengt-$time available" \
+	     -c "$addr_gvt_maintainer1" \
+	     -c "$addr_gvt_maintainer2" \
+	     -c "xiong.y.zhang@intel.com" \
+	     "$addr_gvt_qa"
+    fi
+
+    git checkout $integration_branch
+    echo "done"
+}
+
 function dim_rebuild_staging
 {
 	local integration_branch=gvt-staging
@@ -394,6 +448,11 @@ function dim_rebuild_staging
 	#fi
 
 	#update_linux_next
+
+	$DRY $DIM_MUA -s "[INFO] New gvt-staging-$time available" \
+	     -c "$addr_gvt_maintainer1" \
+	     -c "$addr_gvt_maintainer2" \
+	     "$addr_gvt_qa"
 }
 
 function dim_staging_forget
