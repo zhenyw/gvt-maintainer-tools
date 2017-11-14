@@ -121,7 +121,8 @@ addr_intel_qa="\"Christophe Prigent\" <christophe.prigent@intel.com>"
 # FIXME
 addr_gvt_maintainer1="\"Zhenyu Wang\" <zhenyuw@linux.intel.com>"
 addr_gvt_maintainer2="zhi.a.wang@intel.com"
-addr_gvt_qa="intel-gvt@eclists.intel.com"
+addr_gvt_internal="intel-gvt@eclists.intel.com"
+addr_gvt_qa="otc.vgt.qa@intel.com"
 
 #
 # Command line options.
@@ -285,7 +286,7 @@ function dim_rebase_xengt
     git branch $xengt_branch origin/$xengt_branch
     git checkout $xengt_branch
 
-    if ! git rebase origin/$integration_branch ; then
+    if ! git rebase -i origin/$integration_branch ; then
 	echo "topic/gvt-xengt failed to rebase onto gvt-staging"
 	#ignore error now
 	cat >> /tmp/xengt-error <<-HERE
@@ -316,7 +317,8 @@ function dim_rebase_xengt
 	     -c "$addr_gvt_maintainer1" \
 	     -c "$addr_gvt_maintainer2" \
 	     -c "xiong.y.zhang@intel.com" \
-	     "$addr_gvt_qa"
+	     -c "$addr_gvt_qa" \
+	     "$addr_gvt_internal"
     fi
 
     git checkout $integration_branch
