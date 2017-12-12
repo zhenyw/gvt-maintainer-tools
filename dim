@@ -786,6 +786,72 @@ function dim_conf
 	dim_checkout gvt-next-fixes "$@"
 }
 
+# check sob for one commit id
+function commit_check_sob
+{
+    local ret=0
+
+    git show $1 --pretty=full > /tmp/$1.tmp
+    local target=/tmp/$1.tmp
+
+    local author=`grep Author $target`
+    author=`echo $author | sed s/Author:// | xargs`
+
+    local committer=`grep Commit $target`
+    committer=`echo $committer | sed s/Commit:// | xargs`
+
+    local author_sob="Signed-off-by: $author"
+    local committer_sob="Signed-off-by: $committer"
+
+    grep -q "$author_sob" $target
+    if [ ! $? -eq 0 ]; then
+	#sob missing for author $author, require $author_sob"
+	ret=1
+    fi
+
+    grep -q "$committer_sob" $target
+    if [ ! $? -eq 0 ]; then
+	#echo "sob missing for committer $committer, require $committer_sob"
+	ret=1
+    fi
+    rm -f $target
+    return $ret
+}
+
+function dim_check_next_sob
+{
+    assert_branch gvt-next
+    commits=`git log --format=%h "$@"`
+
+    for commit in $commits; 
+    do
+	commit_check_sob $commit
+	if [ ! $? -eq 0 ]; then
+	    echo -n "Bad: "
+	else
+	    echo -n "Good: "
+	fi
+	echo `git log -1 --oneline $commit`
+    done
+}
+
+function dim_check_fixes_sob
+{
+    assert_branch gvt-fixes
+    commits=`git log --format=%h "$@"`
+
+    for commit in $commits; 
+    do
+	commit_check_sob $commit
+	if [ ! $? -eq 0 ]; then
+	    echo -n "Bad: "
+	else
+	    echo -n "Good: "
+	fi
+	echo `git log -1 --oneline $commit`
+    done
+}
+
 # $1 is the git sha1 to check
 function checkpatch_commit
 {
