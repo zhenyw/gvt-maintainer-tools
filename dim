@@ -298,15 +298,18 @@ function dim_rebase_xengt
 		HERE
 	git diff >> /tmp/xengt-error
 
-	$DRY $DIM_MUA -s "[INFO] topic/gvt-xengt fail to rebase on gvt-staging" \
+	echo "" | $DRY $DIM_MUA -s "[INFO] topic/gvt-xengt fail to rebase on gvt-staging" \
 	     -i /tmp/xengt-error \
 	     -c "$addr_gvt_maintainer1" \
 	     -c "$addr_gvt_maintainer2" \
 	     -c "xiong.y.zhang@intel.com" \
-	     "$addr_gvt_qa"
+	     -c "$addr_gvt_qa" \
+	     "$addr_gvt_internal"
 
 	git rebase --abort
 	git reset --hard
+
+	rm -f /tmp/xengt-error
     else
 	echo "Tagging gvt-xengt-$time"
 	git tag gvt-xengt-$time
@@ -454,7 +457,8 @@ function dim_rebuild_staging
 	$DRY $DIM_MUA -s "[INFO] New gvt-staging-$time available" \
 	     -c "$addr_gvt_maintainer1" \
 	     -c "$addr_gvt_maintainer2" \
-	     "$addr_gvt_qa"
+	     -c "$addr_gvt_qa" \
+	     "$addr_gvt_internal"
 }
 
 function dim_staging_forget
