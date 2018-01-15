@@ -280,10 +280,11 @@ function dim_rebase_xengt
 
     git fetch origin 
     if git branch | grep $xengt_branch >& /dev/null; then
-	echo "remove old branch"
-	git branch -D $xengt_branch
+	echo "Use current $xengt_branch"
+    else
+	echo "Create new $xengt_branch"
+	git branch $xengt_branch origin/$xengt_branch
     fi
-    git branch $xengt_branch origin/$xengt_branch
     git checkout $xengt_branch
 
     if ! git rebase -i origin/$integration_branch ; then
