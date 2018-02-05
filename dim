@@ -804,30 +804,29 @@ function commit_check_sob
     local author_sob="Signed-off-by: $author"
     local committer_sob="Signed-off-by: $committer"
 
-    grep -q "$author_sob" $target
-    if [ ! $? -eq 0 ]; then
-	#sob missing for author $author, require $author_sob"
-	ret=1
+    if ! grep "$author_sob" $target > /dev/null;  then
+	#echo "sob missing for author $author, require $author_sob"
+	rm -f $target
+	return 1
     fi
 
-    grep -q "$committer_sob" $target
-    if [ ! $? -eq 0 ]; then
+    if ! grep -q "$committer_sob" $target > /dev/null ; then
 	#echo "sob missing for committer $committer, require $committer_sob"
-	ret=1
+	rm -f $target
+	return 1
     fi
-    rm -f $target
-    return $ret
+
+    return 0
 }
 
 function dim_check_next_sob
 {
     assert_branch gvt-next
-    commits=`git log --format=%h "$@"`
+    local commits=`git log --format=%h "$@"`
 
     for commit in $commits; 
     do
-	commit_check_sob $commit
-	if [ ! $? -eq 0 ]; then
+	if ! commit_check_sob $commit; then
 	    echo -n "Bad: "
 	else
 	    echo -n "Good: "
@@ -839,12 +838,11 @@ function dim_check_next_sob
 function dim_check_fixes_sob
 {
     assert_branch gvt-fixes
-    commits=`git log --format=%h "$@"`
+    local commits=`git log --format=%h "$@"`
 
     for commit in $commits; 
     do
-	commit_check_sob $commit
-	if [ ! $? -eq 0 ]; then
+	if ! commit_check_sob $commit; then
 	    echo -n "Bad: "
 	else
 	    echo -n "Good: "
@@ -856,12 +854,11 @@ function dim_check_fixes_sob
 function dim_check_next_fixes_sob
 {
     assert_branch gvt-next-fixes
-    commits=`git log --format=%h "$@"`
+    local commits=`git log --format=%h "$@"`
 
-    for commit in $commits; 
+    for commit in $commits;
     do
-	commit_check_sob $commit
-	if [ ! $? -eq 0 ]; then
+	if ! commit_check_sob $commit; then
 	    echo -n "Bad: "
 	else
 	    echo -n "Good: "
