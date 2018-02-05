@@ -795,10 +795,10 @@ function commit_check_sob
     git show $1 --pretty=full > /tmp/$1.tmp
     local target=/tmp/$1.tmp
 
-    local author=`grep Author $target`
+    local author=`grep -m 1 Author $target`
     author=`echo $author | sed s/Author:// | xargs`
 
-    local committer=`grep Commit $target`
+    local committer=`grep -m 1 Commit $target`
     committer=`echo $committer | sed s/Commit:// | xargs`
 
     local author_sob="Signed-off-by: $author"
@@ -839,6 +839,23 @@ function dim_check_next_sob
 function dim_check_fixes_sob
 {
     assert_branch gvt-fixes
+    commits=`git log --format=%h "$@"`
+
+    for commit in $commits; 
+    do
+	commit_check_sob $commit
+	if [ ! $? -eq 0 ]; then
+	    echo -n "Bad: "
+	else
+	    echo -n "Good: "
+	fi
+	echo `git log -1 --oneline $commit`
+    done
+}
+
+function dim_check_next_fixes_sob
+{
+    assert_branch gvt-next-fixes
     commits=`git log --format=%h "$@"`
 
     for commit in $commits; 
