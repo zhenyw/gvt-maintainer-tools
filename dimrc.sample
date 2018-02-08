@@ -19,7 +19,7 @@
 #DIM_MUA=mutt
 
 # Command to run after dim apply
-#DIM_POST_APPLY_ACTION=
+#DIM_POST_APPLY_ACTION= 
 
 # You may also need to add your git proxy setting here for working inside intel network
 # e.g export GIT_PROXY_COMMAND=xxx
