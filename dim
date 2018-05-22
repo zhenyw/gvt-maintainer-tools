@@ -280,7 +280,9 @@ function dim_rebase_xengt
 
     git fetch origin 
     if git branch | grep $xengt_branch >& /dev/null; then
-	echo "Use current $xengt_branch"
+	echo "Force to refresh current $xengt_branch"
+	git branch -D $xengt_branch
+	git fetch origin +$xengt_branch:$xengt_branch
     else
 	echo "Create new $xengt_branch"
 	git branch $xengt_branch origin/$xengt_branch
