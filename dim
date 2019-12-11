@@ -275,14 +275,21 @@ function dim_rebase_xengt
     local integration_branch=gvt-staging
     local xengt_branch=topic/gvt-xengt
     local time="`date +%Yy-%mm-%dd-%Hh-%Mm-%Ss`"
+    local force_local=$1
 
+    echo "./dim rebase-xengt <y> : <y> to force local branch usually after resolving conflict."
+    
     cd $DIM_PREFIX/$integration_branch
 
     git fetch origin 
     if git branch | grep $xengt_branch >& /dev/null; then
-	echo "Force to refresh current $xengt_branch"
-	git branch -D $xengt_branch
-	git fetch origin +$xengt_branch:$xengt_branch
+	if [[ "x$force_local" = "x" ]]; then
+	    echo "Force to refresh current $xengt_branch from remote"
+	    git branch -D $xengt_branch
+	    git fetch origin +$xengt_branch:$xengt_branch
+	else
+	    echo "Force to use local $xengt_branch"
+	fi
     else
 	echo "Create new $xengt_branch"
 	git branch $xengt_branch origin/$xengt_branch
