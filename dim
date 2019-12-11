@@ -122,7 +122,7 @@ addr_intel_qa="\"Christophe Prigent\" <christophe.prigent@intel.com>"
 addr_gvt_maintainer1="\"Zhenyu Wang\" <zhenyuw@linux.intel.com>"
 addr_gvt_maintainer2="zhi.a.wang@intel.com"
 addr_gvt_internal="intel-gvt@eclists.intel.com"
-addr_gvt_qa="otc.vgt.qa@intel.com"
+addr_gvt_qa="ssp.gvt.qa@intel.com"
 
 #
 # Command line options.
