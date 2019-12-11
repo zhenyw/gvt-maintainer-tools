@@ -514,6 +514,34 @@ function dim_push_gvt_next_fixes
     dim_push_branch gvt-next-fixes "$@"
 }
 
+function apply_patch
+{
+    patch="$1"
+    shift
+    local message_id=$(message_get_id $patch)
+    local commiter_email=$(git config --get user.email)
+    local patch_from=$(grep "From:" "$patch" | head -1)
+    local sob
+    if [[ "$patch_from" != *"$commiter_email"* ]] ; then
+	sob=-s
+    fi
+
+    if ! git am --scissors -3 $sob "$@" $patch ; then
+        echoerr "ERROR: git apply-mbox failed"
+        return 1
+    fi
+    if [ -n "$message_id" ]; then
+	dim_commit_add_tag "Link: http://patchwork.freedesktop.org/patch/msgid/$message_id"
+    else
+	echo "No message-id found in the patch file."
+    fi
+
+    checkpatch_commit HEAD
+
+    eval $DRY $DIM_POST_APPLY_ACTION
+    return 0
+}
+
 # ensure we're on branch $1, and apply patches. the rest of the arguments are
 # passed to git am.
 dim_alias_ab=apply-branch
@@ -523,33 +551,22 @@ function dim_apply_branch
 	local branch=$1
 	shift
 	local file=`mktemp`
+	local dir=`mktemp -d`
+	local rv
 
 	assert_branch $branch
 	assert_repo_clean
 
 	cat > $file
+	git mailsplit -b -o$dir $file > /dev/null
 
-	# ignore message_id for now
-#	local message_id=$(message_get_id $file)
-
-	local commiter_email=$(git config --get user.email)
-	local patch_from=$(grep "From:" "$file" | head -1)
-	local sob
-	if [[ "$patch_from" != *"$commiter_email"* ]] ; then
-		sob=-s
-	fi
-
-	cat $file | git am -3 $sob "$@"
-
-#	if [ -n "$message_id" ]; then
-#		dim_commit_add_tag "Link: http://patchwork.freedesktop.org/patch/msgid/$message_id"
-#	else
-#		echo "No message-id found in the patch file."
-#	fi
-
-	checkpatch_commit HEAD
-
-	eval $DRY $DIM_POST_APPLY_ACTION
+	for patch in "$dir"/*; do
+            if ! apply_patch $patch "$@"; then
+                rv=1
+            fi
+        done
+        rm -rf $file $dir
+        return $rv
 }
 
 dim_alias_aq=apply-gvt-next
