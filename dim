@@ -108,6 +108,7 @@ drm_intel_upstream_git=git://anongit.freedesktop.org/drm-intel
 drm_tip_upstream_git=git://anongit.freedesktop.org/drm/drm-tip
 vfio_upstream_git=https://github.com/awilliam/linux-vfio.git
 kvm_upstream_git=git://git.kernel.org/pub/scm/virt/kvm/kvm.git
+intel_iommu_git=https://git.kernel.org/pub/scm/linux/kernel/git/joro/iommu.git
 
 # email aliases
 addr_drm_maintainer="Dave Airlie <airlied@gmail.com>"
@@ -1357,7 +1358,13 @@ function dim_setup
 		git remote add kvm-upstream $kvm_upstream_git
 	fi
 
-	echo "staging_branches=\"drm-tip/drm-tip kvm-upstream/linux-next vfio-upstream/next origin/gvt-next\"" > $DIM_PREFIX/staging.conf
+	if git remote | grep intel-iommu > /dev/null ; then
+		git config remote.intel-iommu.url $intel_iommu_git
+	else
+		git remote add intel-iommu $intel_iommu_git
+	fi
+
+	echo "staging_branches=\"drm-tip/drm-tip kvm-upstream/linux-next vfio-upstream/next origin/gvt-next intel-iommu/x86/vt-d\"" > $DIM_PREFIX/staging.conf
 
 	echo "gvt dim setup successfully completed!"
 }
