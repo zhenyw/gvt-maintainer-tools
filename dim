@@ -528,7 +528,7 @@ function apply_patch
     fi
 
     if ! git am --scissors -3 $sob "$@" $patch ; then
-        echoerr "ERROR: git apply-mbox failed"
+        echo "ERROR: git apply-mbox failed"
         return 1
     fi
     if [ -n "$message_id" ]; then
