@@ -123,7 +123,8 @@ addr_intel_qa="\"Christophe Prigent\" <christophe.prigent@intel.com>"
 addr_gvt_maintainer1="\"Zhenyu Wang\" <zhenyuw@linux.intel.com>"
 addr_gvt_maintainer2="zhi.a.wang@intel.com"
 addr_gvt_internal="intel-gvt@eclists.intel.com"
-addr_gvt_qa="ssp.gvt.qa@intel.com"
+addr_gvt_intel="sse.gvt@intel.com"
+addr_gvt_qa="sse.gvt.qa@intel.com"
 
 #
 # Command line options.
@@ -315,6 +316,7 @@ function dim_rebase_xengt
 	     -c "$addr_gvt_maintainer2" \
 	     -c "xiong.y.zhang@intel.com" \
 	     -c "$addr_gvt_qa" \
+	     -c "$addr_gvt_intel" \
 	     "$addr_gvt_internal"
 
 	git rebase --abort
@@ -332,6 +334,7 @@ function dim_rebase_xengt
 	     -c "$addr_gvt_maintainer2" \
 	     -c "xiong.y.zhang@intel.com" \
 	     -c "$addr_gvt_qa" \
+	     -c "$addr_gvt_intel" \
 	     "$addr_gvt_internal"
     fi
 
@@ -346,6 +349,7 @@ function dim_rebuild_staging
 	local time="`date +%Yy-%mm-%dd-%Hh-%Mm-%Ss`"
 	local commit_time="$time CST"
 	local first=1
+	local force_push_and_tag=$1
 
 	#local rerere=$DIM_PREFIX/gvt-rerere
 
@@ -367,6 +371,31 @@ function dim_rebuild_staging
 	if ! git branch | grep $integration_branch | grep '\*' >& /dev/null ; then
 		echo "Branch setup for the integration repo is borked(not on $integration_branch?)"
 		exit 1
+	fi
+
+	if [ x"$force_push_and_tag" != x ]; then
+	    echo "Warn: just tag and push for local change..."
+	    echo -n "Adding integration manifest $integration_branch: $commit_time... "
+	    mv $specfile integration-manifest
+	    git add integration-manifest
+	    git commit --quiet -m "$integration_branch: $commit_time integration manifest"
+	    echo "Done."
+
+	    echo "Pushing $integration_branch... "
+	    $INTERACTIVE
+	    git push origin +HEAD >& /dev/null && echo "Done." || echo "Fail"
+
+	    echo "Tagging: $time... "
+	    git tag gvt-staging-$time
+	    git push origin gvt-staging-$time >& /dev/null && echo "Done." || echo "Fail"
+
+	    $DIM_MUA -s "[INFO] New gvt-staging-$time available" \
+		 -c "$addr_gvt_maintainer1" \
+		 -c "$addr_gvt_maintainer2" \
+		 -c "$addr_gvt_qa" \
+		 -c "$addr_gvt_intel" \
+		 "$addr_gvt_internal"
+	    exit 0
 	fi
 
 	for remote in $(echo $staging_branches | tr " " "\n" | sed 's|/.*$||g' | sort -u); do
@@ -469,6 +498,7 @@ function dim_rebuild_staging
 	     -c "$addr_gvt_maintainer1" \
 	     -c "$addr_gvt_maintainer2" \
 	     -c "$addr_gvt_qa" \
+	     -c "$addr_gvt_intel" \
 	     "$addr_gvt_internal"
 }
 
@@ -505,6 +535,11 @@ function dim_push_gvt_next
     dim_push_branch gvt-next "$@"
 }
 
+function dim_push_gvt_gt_next
+{
+    dim_push_branch gvt-gt-next "$@"
+}
+
 function dim_push_gvt_fixes
 {
     dim_push_branch gvt-fixes "$@"
@@ -537,6 +572,10 @@ function apply_patch
 	echo "No message-id found in the patch file."
     fi
 
+    #assume: git config alias.rb "interpret-trailers --trailer \
+    # \"Reviewed-by: $(git config user.name) <$(git config user.email)>\" --in-place"
+    GIT_EDITOR="git rb" git commit --amend
+    
     checkpatch_commit HEAD
 
     eval $DRY $DIM_POST_APPLY_ACTION
@@ -574,6 +613,12 @@ dim_alias_aq=apply-gvt-next
 function dim_apply_gvt_next
 {
 	dim_apply_branch gvt-next "$@"
+}
+
+dim_alias_aq=apply-gvt-gt-next
+function dim_apply_gvt_gt_next
+{
+	dim_apply_branch gvt-gt-next "$@"
 }
 
 dim_alias_af=apply-gvt-fixes
@@ -802,6 +847,10 @@ function dim_checkout
 function dim_con
 {
 	dim_checkout gvt-next "$@"
+}
+function dim_cogn
+{
+	dim_checkout gvt-gt-next "$@"
 }
 
 function dim_cof
@@ -1123,7 +1172,8 @@ function dim_update_next_continue
 	     -i ~/tmp/test-request \
 	     -c "$addr_gvt_maintainer1" \
 	     -c "$addr_gvt_maintainer2" \
-	     "$addr_gvt_qa"
+	     "$addr_gvt_qa" \
+	     "$addr_gvt_intel"
 }
 
 function dim_tag_next
@@ -1364,7 +1414,7 @@ function dim_setup
 		git remote add intel-iommu $intel_iommu_git
 	fi
 
-	echo "staging_branches=\"drm-tip/drm-tip kvm-upstream/linux-next vfio-upstream/next origin/gvt-next intel-iommu/x86/vt-d\"" > $DIM_PREFIX/staging.conf
+	echo "staging_branches=\"drm-tip/drm-tip kvm-upstream/linux-next vfio-upstream/next origin/gvt-next origin/gvt-fixes origin/gvt-next-fixes origin/gvt-gt-next intel-iommu/x86/vt-d\"" > $DIM_PREFIX/staging.conf
 
 	echo "gvt dim setup successfully completed!"
 }
