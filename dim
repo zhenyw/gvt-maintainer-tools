@@ -386,6 +386,7 @@ function dim_rebuild_staging
 	    git push origin +HEAD >& /dev/null && echo "Done." || echo "Fail"
 
 	    echo "Tagging: $time... "
+	    $INTERACTIVE
 	    git tag gvt-staging-$time
 	    git push origin gvt-staging-$time >& /dev/null && echo "Done." || echo "Fail"
 
