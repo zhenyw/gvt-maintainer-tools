@@ -103,7 +103,7 @@ today=`date +%Y-%m-%d`
 #driver_core_upstream_git=git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/driver-core.git
 linux_upstream_git=git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
 
-gvt_linux_git=https://github.com/intel/gvt-linux
+gvt_linux_git=git@github.com:intel/gvt-linux
 drm_intel_upstream_git=git://anongit.freedesktop.org/drm-intel
 drm_tip_upstream_git=git://anongit.freedesktop.org/drm/drm-tip
 vfio_upstream_git=https://github.com/awilliam/linux-vfio.git
